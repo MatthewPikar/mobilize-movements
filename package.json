@@ -1,6 +1,11 @@
 {
   "name": "movements",
   "version": "0.0.0",
+  "description": "Microservice handling all movement operations.",
+  "author": {
+    "name": "Matthew Pikar",
+    "email": "matthew.pikar@gmail.com"
+  },
   "private": true,
   "scripts": {
     "start": "node ./src/movementsService.js"
