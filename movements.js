@@ -1,24 +1,47 @@
 /**
- * Created by mattpiekarczyk on 9/19/15.
+    Created by mattpiekarczyk on 9/19/15.
+
+    Message Format
+    --------------
+    requestId: number
+    status:     {code, message, description}
+    error:      {error}
+    limit:      integer (with hard set limit)
+    skip:       integer
+    fields:     [fields]
+    sort:       field:boolean
+    resources:  [{resource}]
+
  */
-// todo implement add multiple
-// todo implement modify multiple
-//
-// Message Format
-// --------------
-// requestId: number
-// status: {code, message, description}
-// errors: [{code, message, description, stack}]
-// limit: integer (with hard set limit)
-// skip: integer
-// fields: [fields]
-// sort: field:boolean
-// resources: [resources]/{resource}
+// todo implement limit, fields, sort, skip when moved to a db
+// todo: implement custom rules for array/object argument type detection
+// todo: implement custom rule for detection of illegal characters (in fields for example)
+// todo: externalize id generation
+// todo: add seneca.close(); when moving to db
 
 "use strict";
 
+/*var customRules = {
+    rules:{
+        container$: function(ctxt, cb){
+            //var isContainer = ctxt.rule.spec;
+            var val = ctxt.point;
+
+            if(!(Array.isArray(val) || typeof(val) === 'object'))
+                return ctxt.util.fail(ctxt, cb);
+            return cb();
+        }},
+    msgs:{
+        container$: 'The <%=property%> property is not an Array nor an Object.'
+    },
+    valid:{
+        name: 'container$',
+        rules:{type$:'boolean'}
+    }
+};*/
+
 var _ = require('lodash'),
-    Response = require('./lib/response/response.js'),
+    Response = require('response'),
     parameterTest = require('parambulator'),
     asynch = require('async')
     ;
@@ -29,11 +52,6 @@ var movementFormat = {
     name: 'string$',
     description: 'string$',
     image: 'string$'
-};
-
-var errorInternal = {
-    http$: {status:500},
-    why:   'Internal error.'
 };
 
 function generateId(){
@@ -52,7 +70,8 @@ module.exports = function movements(options) {
         hardLimit: 20,
         sort: {},
         skip: 0,
-        fields: []
+        fields: [],
+        query: ""
     },options);
 
     seneca
@@ -73,81 +92,75 @@ module.exports = function movements(options) {
         return respond();
     }
 
+    // todo: fix sort
     function queryMovements(args, respond) {
-        var errorTriggered = false;
+        var response = new Response({requestId: args.requestId}, respond);
+        var parameterFormat = parameterTest({
+            required$:  ['requestId'],
+            requestId:  'string$',
+            fields:     {type$:'array', '*': {type$:'string$', required$:true}}
+        }).validate(args, function (err) {
+            if (err) return response.make(400, {error: err});
 
-        var parameterDescription = parameterTest({
-            query:      {type$:'string'},
-            limit:      {type$:'integer'},
-            skip:       {type$:'integer'},
-            sort:       {type$:'object', '*': {type$:'boolean', required$:true}},
-            fields:     {type$:'array'}
-        });
+            var params = {};
 
-        parameterDescription.validate(args, function (err) {
-            if (err) {
-                errorTriggered = true;
-                return respond(err, null);
+            // Catch any critical formatting errors that were not caught by the rules.
+            try {
+                // Load defaults if not provided in call.
+                params = {
+                    query: (typeof(args.query) === 'string') ? args.query.replace(/[^\w\s]/gi, ' ') : options.query,
+                    limit: (typeof(args.limit) === 'number') ? args.limit > options.hardLimit ? options.hardLimit : args.limit : options.limit,
+                    skip: (typeof(args.skip) === 'number') ? args.skip : options.skip,
+                    fields: (args.fields) ? args.fields : options.fields,
+                    sort: options.sort
+                };
+
+                /*if(
+                 typeof(args.sort === 'object') &&
+                 (_.size(args.sort) === 1) &&
+                 _.includes(movementFormat.only$, (args.sort)) &&
+                 typeof(_.values(args.sort)[0]) === 'boolean'
+                 ) {
+                 var sortField = ((_.keys(args.sort))[0]),
+                 sortOrder = ((_.values(args.sort))[0] ? 1 : -1);
+                 params.sort = {sortField:sortOrder};
+                 //params.sort = { ((_.keys(args.sort))[0])  :  ((_.values(args.sort))[0] ? 1 : -1) };
+                 }*/
+            } catch(err) {
+                return response.make(400, {error: err});
             }
-        });
 
-        if (errorTriggered) return null;
+            if (!(typeof args.query === "undefined"  || args.query === "")) {
+                seneca.make$('movement').list$(
+                    {name: params.query,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
+                    function (err, resources) {
+                        if(err) return response.make(400, {error: err});
+                        else if(!resources || resources.length === 0)
+                            return response.make(204, params);
+                        else {
+                            for(var i = 0, len = resources.length; i<len; i++)
+                                resources[i] = resources[i].data$(false);
 
-        //if (args.test != true)
-        //    return respond(new Error("Test failed to catch!!"));
+                            params.resources = resources;
+                            return response.make(200, params);
+                        }
+                });
+            } else {
+                seneca.make$('movement').list$(
+                    {limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
+                    function (err, resources) {
+                        if(err) return response.make(400, {error: err});
+                        else if(!resources || resources.length === 0)
+                            return response.make(204, params);
+                        else {
+                            for(var i = 0, len = resources.length; i<len; i++)
+                                resources[i] = resources[i].data$(false);
 
-        // todo: figure out why query parameters are not working
-        // Load defaults if options not provided in call.
-        var limit = (typeof args.limit !== "undefined") ? args.limit > options.hardLimit ? options.hardLimit : args.limit : options.limit;
-        var skip = (typeof args.skip !== "undefined") ? args.skip : options.skip;
-        var fields = (typeof args.fields !== "undefined") ? args.fields : options.fields;
-        var sort = (typeof args.sort !== "undefined") ? args.sort : options.sort;
-        var query = args.query;
-
-        //var sort = options.sort;
-        // todo: turn boolean sort to -1/1 for ascending/descending
-
-        if (typeof args.query !== "undefined") {
-            seneca.make$('movement').list$(
-                {name: query, limit$:limit, skip$:skip, fields$:fields, sort$:sort},
-                function (err, movements) {
-                    if(err) return respond(err, null);
-                    else if(!movements || movements.length === 0) {
-
-
-                        return respond(null, {
-                            http$: {status: 401},
-                            why: "No resources matching " + query + " found."
-                        });
-                    }
-                    else {
-                        for(var i = 0, len = movements.length; i<len; i++)
-                            movements[i] = movements[i].data$(false);
-
-                        return respond(null, {count: movements.length, movements:movements});
-                    }
-            });
-        } else {
-            seneca.make$('movement').list$(
-                {sort$:sort, limit$:limit, skip$:skip, fields$:fields},
-                function (err, movements) {
-                    if(err) return respond(null, errorInternal);
-                    else if(!movements || movements.length === 0)
-                        return respond(null, {
-                            http$: {status:401},
-                            why:   "No resources found."
-                        });
-                    else {
-                        for(var i = 0, len = movements.length; i<len; i++)
-                            movements[i] = movements[i].data$(false);
-
-                        return respond(null, {count: movements.length, movements:movements});
-                    }
-            });
-        }
-    }
-
-    // responds true if any of the provided movements exist
+                            params.resources = resources;
+                            return response.make(200, params);
+                        }
+                });
+    }});}
 
     function getMovement(args, respond) {
         var response = new Response({requestId: args.requestId}, respond);
@@ -167,8 +180,6 @@ module.exports = function movements(options) {
         });
     }
 
-    // todo: check if resource already exists
-    // todo: add seneca.close(); when moving to db
     function addMovements(args, respond){
         var response = new Response({requestId: args.requestId}, respond);
         var parameterFormat = parameterTest({
@@ -182,47 +193,40 @@ module.exports = function movements(options) {
             asynch.some(
                 args.resources,
                 function(resource, callback){
-                    seneca.make$('movement').list$(
-                        {name: resource.name, fields$:['name']},
+                    seneca.make$('movement').load$(
+                        {name: resource.name, fields$:['id']},
                         function (err, resources) {
                             if (err) return callback(false);
                             else if(!resources || resources.length === 0) return callback(false);
                             else return callback(true);
-                        });
-                },
+                });},
                 function(result){
                     if(result) return response.make(409);
-                }
-            );
 
-            seneca.ready(function (err) {
-                if (err) return response.make(500, {error: err});
+                    // Non of the resources alredy exist, so create them!
+                    else {
+                        seneca.ready(function (err) {
+                            if (err) return response.make(500, {error: err});
 
-                asynch.map(
-                    args.resources,
-                    function(resource, callback){
-                        seneca.make$('movement', {
-                            id: generateId(),
-                            name: resource.name,
-                            description: resource.description,
-                            image: resource.image,
-                            organizers: resource.organizers
-                        }).save$(function (err, movement) {
-                            if (err) return callback(err);
-                            else callback(null, movement.data$(false));
-                        });
-                    },
-                    function(err, results){
-                        if (err) return response.make(500, {error: err});
-                        else return response.make(201, {resources:results});
-                    }
-                );
-            });
-        });
-    }
+                            asynch.map(
+                                args.resources,
+                                function(resource, callback){
+                                    seneca.make$('movement', {
+                                        id: generateId(),
+                                        name: resource.name,
+                                        description: resource.description,
+                                        image: resource.image,
+                                        organizers: resource.organizers
+                                    }).save$(function (err, movement) {
+                                        if (err) return callback(err);
+                                        else callback(null, movement.data$(false));
+                                    });
+                                },
+                                function(err, results){
+                                    if (err) return response.make(500, {error: err});
+                                    else return response.make(201, {resources:results});
+    });});}});});}
 
-    // todo: check if resource already exists
-    // todo: add seneca.close(); when moving to db
     function modifyMovement(args, respond){
         var response = new Response({requestId: args.requestId}, respond);
         var parameterFormat = parameterTest({
@@ -236,46 +240,43 @@ module.exports = function movements(options) {
             asynch.some(
                 args.resources,
                 function(resource, callback){
-                    seneca.make$('movement').list$(
+                    seneca.make$('movement').load$(
                         {id: resource.id, fields$:['id']},
                         function (err, resources) {
                             if (err) return callback(false);
                             else if(!resources || resources.length === 0) return callback(true);
-                            else return callback(true);
+                            else return callback(false);
                         });
                 },
                 function(result){
                     if(result) return response.make(404);
-                }
-            );
 
-            seneca.ready(function (err) {
-                if (err) return response.make(500, {error: err});
+                    // All resources are valid, so modify them!
+                    else {
+                        seneca.ready(function (err) {
+                            if (err) return response.make(500, {error: err});
 
-                asynch.map(
-                    args.resources,
-                    function (modResource, callback) {
-                        seneca.make$('movement').load$(modResource.id, function (err, resource) {
-                            if (err) return callback(err);
-                            else {
-                                if (modResource.name)        resource.data$({name: modResource.name});
-                                if (modResource.description) resource.data$({description: modResource.description});
-                                if (modResource.image)       resource.data$({image: args.movement.image});
-                                if (modResource.organizers)  resource.data$({organizers: modResource.organizers});
-                            }
-                        }).save$(function (err, movement) {
-                            if (err) return callback(err);
-                            else callback(null, movement.data$(false));
-                        });
-                    },
-                    function (err, results) {
-                        if (err) return response.make(500, {error: err});
-                        else return response.make(200, {resources: results});
-                    }
-                );
-            });
-        });
-    }
+                            asynch.map(
+                                args.resources,
+                                function (modResource, callback) {
+                                    seneca.make$('movement').load$(modResource.id, function (err, resource) {
+                                        if (err) return callback(err);
+                                        else {
+                                            if (modResource.name)        resource.data$({name: modResource.name});
+                                            if (modResource.description) resource.data$({description: modResource.description});
+                                            if (modResource.image)       resource.data$({image: modResource.image});
+                                            if (modResource.organizers)  resource.data$({organizers: modResource.organizers});
+
+                                            resource.save$(function (err, movement) {
+                                                if (err) return callback(err);
+                                                else callback(null, movement.data$(false));
+                                            });
+                                    }});
+                                },
+                                function (err, results) {
+                                    if (err) return response.make(500, {error: err});
+                                    else return response.make(200, {resources: results});
+    });});}});});}
 
     function deleteMovement(args, respond){
         var response = new Response({requestId: args.requestId}, respond);
