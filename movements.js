@@ -54,6 +54,7 @@ var movementFormat = {
     image: 'string$'
 };
 
+// todo: factor out id generation to an external package/service
 function generateId(){
     var len = 16;
 
