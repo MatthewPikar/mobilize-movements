@@ -84,8 +84,6 @@ module.exports = function movements(options) {
         .add({role: 'movements', cmd: 'add'},       addMovements)
         .add({role: 'movements', cmd: 'modify'},    modifyMovement)
         .add({role: 'movements', cmd: 'delete'},    deleteMovement)
-        .add({role: 'movements', cmd: 'queryAsynch'},     queryMovementsAsynch)
-
     ;
 
     function initialize(args, respond){
@@ -166,76 +164,6 @@ module.exports = function movements(options) {
                         }
                 });
     }});}
-
-    function queryMovementsAsynch(args, respond) {
-        var response = new Response({requestId: args.requestId}, respond);
-        var parameterFormat = parameterTest({
-            required$:  ['requestId'],
-            requestId:  'string$',
-            fields:     {type$:'array', '*': {type$:'string$', required$:true}}
-        }).validate(args, function (err) {
-            if (err) return response.make(400, {error: err});
-
-            var params = {};
-
-            // Catch any critical formatting errors that were not caught by the rules.
-            try {
-                // Load defaults if not provided in call.
-                params = {
-                    query: (typeof(args.query) === 'string') ? args.query.replace(/[^\w\s]/gi, ' ') : options.query,
-                    limit: (typeof(args.limit) === 'number') ? args.limit > options.hardLimit ? options.hardLimit : args.limit : options.limit,
-                    skip: (typeof(args.skip) === 'number') ? args.skip : options.skip,
-                    fields: (args.fields) ? args.fields : options.fields,
-                    sort: options.sort
-                };
-
-                /*if(
-                 typeof(args.sort === 'object') &&
-                 (_.size(args.sort) === 1) &&
-                 _.includes(movementFormat.only$, (args.sort)) &&
-                 typeof(_.values(args.sort)[0]) === 'boolean'
-                 ) {
-                 var sortField = ((_.keys(args.sort))[0]),
-                 sortOrder = ((_.values(args.sort))[0] ? 1 : -1);
-                 params.sort = {sortField:sortOrder};
-                 //params.sort = { ((_.keys(args.sort))[0])  :  ((_.values(args.sort))[0] ? 1 : -1) };
-                 }*/
-            } catch(err) {
-                return response.make(400, {error: err});
-            }
-
-            if (!(typeof args.query === "undefined"  || args.query === "")) {
-                seneca.make$('movement').list$(
-                    {name: params.query,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
-                    function (err, resources) {
-                        if(err) return response.make(400, {error: err});
-                        else if(!resources || resources.length === 0)
-                            return response.make(204, params);
-                        else {
-                            for(var i = 0, len = resources.length; i<len; i++)
-                                resources[i] = resources[i].data$(false);
-
-                            params.resources = resources;
-                            return response.make(200, params);
-                        }
-                    });
-            } else {
-                seneca.make$('movement').list$(
-                    {limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
-                    function (err, resources) {
-                        if(err) return response.make(400, {error: err});
-                        else if(!resources || resources.length === 0)
-                            return response.make(204, params);
-                        else {
-                            for(var i = 0, len = resources.length; i<len; i++)
-                                resources[i] = resources[i].data$(false);
-
-                            params.resources = resources;
-                            return response.make(200, params);
-                        }
-                    });
-            }});}
-
 
     function getMovement(args, respond) {
         var response = new Response({requestId: args.requestId}, respond);
