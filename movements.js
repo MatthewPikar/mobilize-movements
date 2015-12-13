@@ -97,7 +97,7 @@ module.exports = function movements(options) {
 
     // todo: fix sort
     function queryMovements(args, respond) {
-        var response = new Response({requestId: args.requestId}, respond);
+        var response = new Response(respond, {requestId: args.requestId});
         var parameterFormat = parameterTest({
             required$:  ['requestId'],
             requestId:  'string$',
@@ -166,7 +166,7 @@ module.exports = function movements(options) {
     }});}
 
     function getMovement(args, respond) {
-        var response = new Response({requestId: args.requestId}, respond);
+        var response = new Response(respond, {requestId: args.requestId});
         var parameterFormat = parameterTest({
             required$:  ['id', 'requestId'],
             id:         'string$',
@@ -183,14 +183,17 @@ module.exports = function movements(options) {
         });
     }
 
+    // todo: catch empty resource array
     function addMovements(args, respond){
-        var response = new Response({requestId: args.requestId}, respond);
+        var response = new Response(respond, {requestId: args.requestId});
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
+            notempty$:  ['resources'],
             requestId:  'string$',
             resources:  {type$:'array', '*': movementFormat}
         }).validate(args, function (err) {
             if (err) return response.make(400, {error: err});
+            if (args.resources.length === 0) return response.make(400, {error: 'No resources provided.'});
 
             // check if any of the resources already exist, fail if any do.
             asynch.some(
@@ -231,13 +234,14 @@ module.exports = function movements(options) {
     });});}});});}
 
     function modifyMovement(args, respond){
-        var response = new Response({requestId: args.requestId}, respond);
+        var response = new Response(respond, {requestId: args.requestId});
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
             requestId:  'string$',
             resources:  {type$:'array', '*': movementFormat}
         }).validate(args, function (err) {
             if (err) return response.make(400, {error: err});
+            if (args.resources.length === 0) return response.make(400, {error: 'No resources provided.'});
 
             // check if all of the resources exist, fail if any do not.
             asynch.some(
@@ -282,7 +286,7 @@ module.exports = function movements(options) {
     });});}});});}
 
     function deleteMovement(args, respond){
-        var response = new Response({requestId: args.requestId}, respond);
+        var response = new Response(respond, {requestId: args.requestId});
         var parameterDescription = parameterTest({
             required$:  ['requestId', 'id'],
             requestId:  'string$',

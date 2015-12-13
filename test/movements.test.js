@@ -8,6 +8,9 @@
 
 // todo: mock out db access using rewire and sinon
 // todo: test against naughty/unsafe inputs
+// todo: it should and provide an error status if an internal error occured and log it.
+// todo: add field support when moving to a db
+
 
 "use strict";
 
@@ -23,7 +26,9 @@ var assert = require('assert'),
     act = Promise.promisify(seneca.act, {context:seneca})
     ;
 
+/*
 var resourceId = [];
+
 
 describe('movements', function(){
     describe('add', function(){
@@ -172,25 +177,6 @@ describe('movements', function(){
         });
     });
     describe('get', function() {
-        // todo: it should and provide an error status if an internal error occured and log it.
-        // todo: add field support when moving to a db
-        /* it('Should return only the fields specified in the fields argument (id is always returned).', function(done){
-         var fields = ['name','description'];
-         seneca
-         .act({role:'movements', cmd:'get', requestId:'test', id:'2f888f2ecfc1c2ca', fields:fields}, function(err, res){
-         if(err) return done(err);
-
-         assert.equal(Object.keys(res.resources).length, fields.length + 1, Object.keys(res.resources).length +1 + " fields returned, " + (fields.length+1) + " expected.")
-
-         assert.notDeepEqual(typeof res.resources['id'], "undefined", "id field was not returned.")
-
-         for(var i=0, len=fields.length; i<len; i++){
-         assert.notDeepEqual(typeof res.resources[fields[i]], "undefined", fields[i] + " field was not returned.")
-         }
-         });
-
-         done();
-         });*/
         it('Should return a 400 status if any arguments are missing or malformed.', function (done) {
             async.parallel([
                 // requestId missing
@@ -583,10 +569,11 @@ describe('movements', function(){
         });
     });
 });
+**/
 
 var resourceId2 = [];
 
-describe('movements (w/ promises)', function(){
+describe('movements', function(){
     describe('add', function(){
         it('Should return a 400 status if any arguments are missing or malformed.', function(){
             var requestIdMissing = act({role:'movements', cmd:'add'});
@@ -597,6 +584,7 @@ describe('movements (w/ promises)', function(){
                 "organizers":[{"name":"matt"},{"name":"sharothi"}]
             }];
             var resourceMissing = act({role:'movements', cmd:'add', requestId:'test4', resources:resource1});
+            var resourceEmpty = act({role:'movements', cmd:'add', requestId:'test4', resources:[]});
             var resource2 = [{
                 "name":false,
                 "description":0,
@@ -625,6 +613,7 @@ describe('movements (w/ promises)', function(){
                 expect(requestIdMissing).to.eventually.have.deep.property('status.code', 400),
                 expect(requestIdMalformed).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceMissing).to.eventually.have.deep.property('status.code', 400),
+                expect(resourceEmpty).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceBadType).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceMalformed).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceUnexpectedFields).to.eventually.have.deep.property('status.code', 400)
@@ -710,11 +699,11 @@ describe('movements (w/ promises)', function(){
          done();
          });*/
         it('Should return a 400 status if any arguments are missing or malformed.', function () {
-            var requestIdMissing = act({role: 'movements', cmd: 'get', id: resourceId[0]});
-            var requestIdMalformed = act({role: 'movements',cmd: 'get',requestId: false,id: resourceId[0]});
+            var requestIdMissing = act({role: 'movements', cmd: 'get', id: resourceId2[0]});
+            var requestIdMalformed = act({role: 'movements',cmd: 'get',requestId: false,id: resourceId2[0]});
             var idMissing = act({role: 'movements', cmd: 'get', requestId: 'test4.2'});
             var idMalformed = act({role: 'movements', cmd: 'get', requestId: 'test4.3', id: 0});
-            var fieldsMalformed = act({role: 'movements',cmd: 'get',requestId: 'test5',id: resourceId[0],fields: 0});
+            var fieldsMalformed = act({role: 'movements',cmd: 'get',requestId: 'test5',id: resourceId2[0],fields: 0});
 
             return Promise.all([
                 expect(requestIdMissing).to.eventually.have.deep.property('status.code', 400),
@@ -748,6 +737,7 @@ describe('movements (w/ promises)', function(){
                 "organizers":[{"name":"matt"},{"name":"sharothi"}]
             }];
             var resourceMissing = act({role:'movements', cmd:'modify', requestId:'test4', resources:resource1});
+            var resourceEmpty = act({role:'movements', cmd:'modify', requestId:'test4', resources:[]});
             var resource2 = [{
                 "name":false,
                 "description":0,
@@ -776,6 +766,7 @@ describe('movements (w/ promises)', function(){
                 expect(requestIdMissing).to.eventually.have.deep.property('status.code', 400),
                 expect(requestIdMalformed).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceMissing).to.eventually.have.deep.property('status.code', 400),
+                expect(resourceEmpty).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceBadType).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceMalformed).to.eventually.have.deep.property('status.code', 400),
                 expect(resourceUnexpectedFields).to.eventually.have.deep.property('status.code', 400)
@@ -867,8 +858,8 @@ describe('movements (w/ promises)', function(){
     });
     describe('delete', function(){
         it('Should return a 400 status if any argument is not provided or malformed.', function(){
-            var requestIdMissing = act({role: 'movements', cmd: 'delete', id: resourceId[0]});
-            var requestIdMalformed = act({role: 'movements',cmd: 'delete',requestId: false,id: resourceId[0]});
+            var requestIdMissing = act({role: 'movements', cmd: 'delete', id: resourceId2[0]});
+            var requestIdMalformed = act({role: 'movements',cmd: 'delete',requestId: false,id: resourceId2[0]});
             var idMissing = act({role: 'movements', cmd: 'delete', requestId: 'test4.2'});
             var idMalformed = act({role: 'movements', cmd: 'delete', requestId: 'test4.3', id: 0});
 
