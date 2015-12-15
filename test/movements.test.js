@@ -679,8 +679,6 @@ describe('movements', function(){
         });
     });
     describe('get', function() {
-        // todo: it should and provide an error status if an internal error occured and log it.
-        // todo: add field support when moving to a db
         /* it('Should return only the fields specified in the fields argument (id is always returned).', function(done){
          var fields = ['name','description'];
          seneca

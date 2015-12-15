@@ -18,6 +18,8 @@
 // todo: implement custom rule for detection of illegal characters (in fields for example)
 // todo: externalize id generation
 // todo: add seneca.close(); when moving to db
+// todo: figure out why notempty$ and type$ don't work
+// todo: fix sort
 
 "use strict";
 
@@ -77,6 +79,8 @@ module.exports = function movements(options) {
         query: ""
     },options);
 
+    var response = new Response({context:'movements'});
+
     seneca
         .add({init: 'movements'},                   initialize)
         .add({role: 'movements', cmd: 'query'},     queryMovements)
@@ -95,15 +99,20 @@ module.exports = function movements(options) {
         return respond();
     }
 
-    // todo: fix sort
     function queryMovements(args, respond) {
-        var response = new Response(respond, {requestId: args.requestId});
+        var res = {requestId: args.requestId};
+        var startTime = Date.now();
+
         var parameterFormat = parameterTest({
             required$:  ['requestId'],
+            notempty$:  ['requestId'],
             requestId:  'string$',
             fields:     {type$:'array', '*': {type$:'string$', required$:true}}
         }).validate(args, function (err) {
-            if (err) return response.make(400, {error: err});
+            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+
+            if( args.requestId === null || args.requestId === "")
+                return response.make(400, res, respond);
 
             var params = {};
 
@@ -130,70 +139,87 @@ module.exports = function movements(options) {
                  //params.sort = { ((_.keys(args.sort))[0])  :  ((_.values(args.sort))[0] ? 1 : -1) };
                  }*/
             } catch(err) {
-                return response.make(400, {error: err});
+                return response.make(400, _.extend(res, {error: err}), respond);
             }
 
+            res = _.extend({requestId: args.requestId}, params);
             if (!(typeof args.query === "undefined"  || args.query === "")) {
                 seneca.make$('movement').list$(
                     {name: params.query,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
-                        if(err) return response.make(400, {error: err});
+                        if(err) return response.make(400, _.extend(res, {error: err}), respond);
                         else if(!resources || resources.length === 0)
-                            return response.make(204, params);
+                            return response.make(204, res, respond);
                         else {
                             for(var i = 0, len = resources.length; i<len; i++)
                                 resources[i] = resources[i].data$(false);
 
-                            params.resources = resources;
-                            return response.make(200, params);
+                            return response.make(200, _.extend(res, {
+                                latency: startTime - Date.now(),
+                                resources:resources
+                            }), respond);
                         }
                 });
             } else {
                 seneca.make$('movement').list$(
                     {limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
-                        if(err) return response.make(400, {error: err});
+                        if(err) return response.make(400, _.extend(res, {error: err}), respond);
                         else if(!resources || resources.length === 0)
-                            return response.make(204, params);
+                            return response.make(204, res, respond);
                         else {
                             for(var i = 0, len = resources.length; i<len; i++)
                                 resources[i] = resources[i].data$(false);
 
-                            params.resources = resources;
-                            return response.make(200, params);
+                            return response.make(200, _.extend(res, {
+                                latency: startTime - Date.now(),
+                                resources:resources
+                            }), respond);
                         }
                 });
     }});}
 
     function getMovement(args, respond) {
-        var response = new Response(respond, {requestId: args.requestId});
+        var res = {requestId: args.requestId};
+        var startTime = Date.now();
         var parameterFormat = parameterTest({
             required$:  ['id', 'requestId'],
+            notempty$:  ['id', 'requestId'],
             id:         'string$',
             requestId:  'string$',
             fields:     'array$'
         }).validate(args, function (err) {
-            if (err) return response.make(400, {error: err});
+            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+
+            if( args.id === null || args.id === "" ||
+                args.requestId === null || args.requestId === "")
+                return response.make(400, res, respond);
 
             seneca.make$('movement').load$({id:args.id, fields$:args.fields}, function(err, movement) {
-                if (err) return response.make(500, {error: err});
-                if (!movement) return response.make(404, {detail: args.id});
-                else return response.make(200, {resources:movement.data$(false)});
+                if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                if (!movement) return response.make(404, _.extend(res, {req: args.id}), respond);
+                else return response.make(200, _.extend(res, {
+                    latency: startTime - Date.now(),
+                    resources:movement.data$(false)
+                }), respond);
             });
         });
     }
 
-    // todo: catch empty resource array
     function addMovements(args, respond){
-        var response = new Response(respond, {requestId: args.requestId});
+        var res = {requestId: args.requestId};
+        var startTime = Date.now();
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
-            notempty$:  ['resources'],
+            notempty$:  ['requestId', 'resources'],
             requestId:  'string$',
             resources:  {type$:'array', '*': movementFormat}
         }).validate(args, function (err) {
-            if (err) return response.make(400, {error: err});
-            if (args.resources.length === 0) return response.make(400, {error: 'No resources provided.'});
+            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+
+            if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond);
+            if( args.requestId === null || args.requestId === "")
+                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond);
 
             // check if any of the resources already exist, fail if any do.
             asynch.some(
@@ -207,12 +233,12 @@ module.exports = function movements(options) {
                             else return callback(true);
                 });},
                 function(result){
-                    if(result) return response.make(409);
+                    if(result) return response.make(409, res, respond);
 
                     // Non of the resources alredy exist, so create them!
                     else {
                         seneca.ready(function (err) {
-                            if (err) return response.make(500, {error: err});
+                            if (err) return response.make(500, _.extend(res, {error: err}), respond);
 
                             asynch.map(
                                 args.resources,
@@ -229,19 +255,27 @@ module.exports = function movements(options) {
                                     });
                                 },
                                 function(err, results){
-                                    if (err) return response.make(500, {error: err});
-                                    else return response.make(201, {resources:results});
+                                    if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                                    else return response.make(201, _.extend(res, {
+                                        latency: startTime - Date.now(),
+                                        resources:results
+                                    }), respond);
     });});}});});}
 
     function modifyMovement(args, respond){
-        var response = new Response(respond, {requestId: args.requestId});
+        var res = {requestId: args.requestId};
+        var startTime = Date.now();
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
+            notempty$:  ['requestId', 'resources'],
             requestId:  'string$',
             resources:  {type$:'array', '*': movementFormat}
         }).validate(args, function (err) {
-            if (err) return response.make(400, {error: err});
-            if (args.resources.length === 0) return response.make(400, {error: 'No resources provided.'});
+            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+
+            if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond);
+            if( args.requestId === null || args.requestId === "")
+                return response.make(400, _.extend(res, {error: new Error('No requestId provided.')}), respond);
 
             // check if all of the resources exist, fail if any do not.
             asynch.some(
@@ -256,12 +290,12 @@ module.exports = function movements(options) {
                         });
                 },
                 function(result){
-                    if(result) return response.make(404);
+                    if(result) return response.make(404, res, respond);
 
                     // All resources are valid, so modify them!
                     else {
                         seneca.ready(function (err) {
-                            if (err) return response.make(500, {error: err});
+                            if (err) return response.make(500, _.extend(res, {error: err}), respond);
 
                             asynch.map(
                                 args.resources,
@@ -281,23 +315,34 @@ module.exports = function movements(options) {
                                     }});
                                 },
                                 function (err, results) {
-                                    if (err) return response.make(500, {error: err});
-                                    else return response.make(200, {resources: results});
+                                    if (err) return response.make(500, _.extend(res, {error: err}), respond);
+                                    else return response.make(200, _.extend(res, {
+                                        latency: startTime - Date.now(),
+                                        resources: results
+                                    }), respond);
     });});}});});}
 
     function deleteMovement(args, respond){
-        var response = new Response(respond, {requestId: args.requestId});
+        var res = {requestId: args.requestId};
+        var startTime = Date.now();
         var parameterDescription = parameterTest({
             required$:  ['requestId', 'id'],
+            notempty$:  ['requestId', 'id'],
             requestId:  'string$',
             id: 'string$'
         }).validate(args, function(err){
-            if (err) return response.make(400, {error: err});
+            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+
+            if( args.id === null || args.id === "" ||
+                args.requestId === null || args.requestId === "")
+                return response.make(400, _.extend(res, {error: new Error('No resource id or requestId provided.')}), respond);
 
             seneca.make$('movement').remove$(args.id, function(err, movement){
-                if(err) return response.make(400, {error: err});
-                else if(!movement) return response.make(404, {detail: "resource id:" + args.id});
-                else return response.make(204, {detail: "Resource: " + args.id + " successfully removed."});
+                if(err) return response.make(400, _.extend(res, {error: err}), respond);
+                else if(!movement) return response.make(404, _.extend(res, {req: args.id}), respond);
+                else return response.make(204, _.extend(res, {
+                            latency: startTime - Date.now()
+                    }), respond);
             });
         });
     }
