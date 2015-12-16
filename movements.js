@@ -79,7 +79,7 @@ module.exports = function movements(options) {
         query: ""
     },options);
 
-    var response = new Response({context:'movements'});
+    var response = new Response({context:'movements', debug:true});
 
     seneca
         .add({init: 'movements'},                   initialize)
@@ -100,7 +100,7 @@ module.exports = function movements(options) {
     }
 
     function queryMovements(args, respond) {
-        var res = {requestId: args.requestId};
+        var res = {requestId: args.requestId, request:'query'};
         var startTime = Date.now();
 
         var parameterFormat = parameterTest({
@@ -109,7 +109,7 @@ module.exports = function movements(options) {
             requestId:  'string$',
             fields:     {type$:'array', '*': {type$:'string$', required$:true}}
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
 
             if( args.requestId === null || args.requestId === "")
                 return response.make(400, res, respond);
@@ -149,13 +149,15 @@ module.exports = function movements(options) {
                     function (err, resources) {
                         if(err) return response.make(400, _.extend(res, {error: err}), respond);
                         else if(!resources || resources.length === 0)
-                            return response.make(204, res, respond);
+                            return response.make(204, _.extend(res, {
+                                latency: Date.now()-startTime
+                            }), respond);
                         else {
                             for(var i = 0, len = resources.length; i<len; i++)
                                 resources[i] = resources[i].data$(false);
 
                             return response.make(200, _.extend(res, {
-                                latency: startTime - Date.now(),
+                                latency: Date.now()-startTime,
                                 resources:resources
                             }), respond);
                         }
@@ -172,7 +174,7 @@ module.exports = function movements(options) {
                                 resources[i] = resources[i].data$(false);
 
                             return response.make(200, _.extend(res, {
-                                latency: startTime - Date.now(),
+                                latency: Date.now()-startTime,
                                 resources:resources
                             }), respond);
                         }
@@ -180,7 +182,7 @@ module.exports = function movements(options) {
     }});}
 
     function getMovement(args, respond) {
-        var res = {requestId: args.requestId};
+        var res = {requestId: args.requestId, request:'get:'+args.id};
         var startTime = Date.now();
         var parameterFormat = parameterTest({
             required$:  ['id', 'requestId'],
@@ -189,7 +191,7 @@ module.exports = function movements(options) {
             requestId:  'string$',
             fields:     'array$'
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
 
             if( args.id === null || args.id === "" ||
                 args.requestId === null || args.requestId === "")
@@ -197,9 +199,9 @@ module.exports = function movements(options) {
 
             seneca.make$('movement').load$({id:args.id, fields$:args.fields}, function(err, movement) {
                 if (err) return response.make(500, _.extend(res, {error: err}), respond);
-                if (!movement) return response.make(404, _.extend(res, {req: args.id}), respond);
+                if (!movement) return response.make(404, res, respond);
                 else return response.make(200, _.extend(res, {
-                    latency: startTime - Date.now(),
+                    latency: Date.now()-startTime,
                     resources:movement.data$(false)
                 }), respond);
             });
@@ -207,7 +209,7 @@ module.exports = function movements(options) {
     }
 
     function addMovements(args, respond){
-        var res = {requestId: args.requestId};
+        var res = {requestId: args.requestId, request:'add'};
         var startTime = Date.now();
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
@@ -215,7 +217,7 @@ module.exports = function movements(options) {
             requestId:  'string$',
             resources:  {type$:'array', '*': movementFormat}
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
 
             if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond);
             if( args.requestId === null || args.requestId === "")
@@ -257,13 +259,13 @@ module.exports = function movements(options) {
                                 function(err, results){
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond);
                                     else return response.make(201, _.extend(res, {
-                                        latency: startTime - Date.now(),
+                                        latency: Date.now()-startTime,
                                         resources:results
                                     }), respond);
     });});}});});}
 
     function modifyMovement(args, respond){
-        var res = {requestId: args.requestId};
+        var res = {requestId: args.requestId, request:'modify'};
         var startTime = Date.now();
         var parameterFormat = parameterTest({
             required$:  ['requestId', 'resources'],
@@ -271,7 +273,7 @@ module.exports = function movements(options) {
             requestId:  'string$',
             resources:  {type$:'array', '*': movementFormat}
         }).validate(args, function (err) {
-            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
 
             if (args.resources.length === 0) return response.make(400, _.extend(res, {error: new Error('No resources provided.')}), respond);
             if( args.requestId === null || args.requestId === "")
@@ -317,13 +319,13 @@ module.exports = function movements(options) {
                                 function (err, results) {
                                     if (err) return response.make(500, _.extend(res, {error: err}), respond);
                                     else return response.make(200, _.extend(res, {
-                                        latency: startTime - Date.now(),
+                                        latency: Date.now()-startTime,
                                         resources: results
                                     }), respond);
     });});}});});}
 
     function deleteMovement(args, respond){
-        var res = {requestId: args.requestId};
+        var res = {requestId: args.requestId, request:'delete:'+args.id};
         var startTime = Date.now();
         var parameterDescription = parameterTest({
             required$:  ['requestId', 'id'],
@@ -331,7 +333,7 @@ module.exports = function movements(options) {
             requestId:  'string$',
             id: 'string$'
         }).validate(args, function(err){
-            if (err) return response.make(400, _.extend(res, {error: err}), respond);
+            if (err) return response.make(400, _.extend(res, {error: {property: err.parambulator.property}}), respond);
 
             if( args.id === null || args.id === "" ||
                 args.requestId === null || args.requestId === "")
@@ -339,9 +341,9 @@ module.exports = function movements(options) {
 
             seneca.make$('movement').remove$(args.id, function(err, movement){
                 if(err) return response.make(400, _.extend(res, {error: err}), respond);
-                else if(!movement) return response.make(404, _.extend(res, {req: args.id}), respond);
+                else if(!movement) return response.make(404, res, respond);
                 else return response.make(204, _.extend(res, {
-                            latency: startTime - Date.now()
+                            latency: Date.now()-startTime
                     }), respond);
             });
         });
