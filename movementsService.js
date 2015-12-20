@@ -11,8 +11,14 @@ for(var i= 2, len=process.argv.length; i<len; i++){
 }
 
 require('seneca')()
+    .use('redis-queue-transport')
     .use('movements', commandlineParameters)
-//    .use('redis-queue-transport')
-//    .listen({type:'redis-queue', pin:{role:'movements',cmd:'*'}})
-    .listen({type:'tcp', port:'30010', pin:'role:movements'})
+//    .use('tmp.js', commandlineParameters)
+    .listen({type:'redis-queue', pin:'role:movements,cmd:get'})
+    .listen({type:'redis-queue', pin:'role:movements,cmd:query'})
+    .listen({type:'redis-queue', pin:'role:movements,cmd:add'})
+    .listen({type:'redis-queue', pin:'role:movements,cmd:modify'})
+    .listen({type:'redis-queue', pin:'role:movements,cmd:delete'})
+//    .listen({type:'redis-queue', pin:'role:movements,cmd:*'})
+//    .listen({type:'tcp', port:'30010', pin:'role:movements'})
 ;

@@ -19,13 +19,11 @@
     limit$, skip$, sort$ supported by SORT and lists
     examine guyellis/seneca-redis-store fork
 */
-// todo: implement db security for redis
 // todo: implement custom rules for array/object argument type detection
 // todo: implement custom rule for detection of illegal characters (in fields for example)
 // todo: externalize id generation
 // todo: add seneca.close(); when moving to db
 // todo: figure out why notempty$ and type$ don't work
-// todo: fix sort
 
 "use strict";
 
@@ -63,7 +61,6 @@ var movementFormat = {
     image: 'string$'
 };
 
-// todo: factor out id generation to an external package/service
 function generateId(){
     var len = 16;
 
