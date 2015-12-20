@@ -14,6 +14,12 @@
 
  */
 // todo implement limit, fields, sort, skip when moved to a db
+/* Need to update the seneca-redis-transport module to support this
+    fields$ supported by HMGET
+    limit$, skip$, sort$ supported by SORT and lists
+    examine guyellis/seneca-redis-store fork
+*/
+// todo: implement db security for redis
 // todo: implement custom rules for array/object argument type detection
 // todo: implement custom rule for detection of illegal characters (in fields for example)
 // todo: externalize id generation
@@ -76,10 +82,12 @@ module.exports = function movements(options) {
         sort: {},
         skip: 0,
         fields: [],
-        query: ""
+        query: "",
+        store: {host:'127.0.0.1', port:'6379', user:'', password:''},
+        debug: false
     },options);
 
-    var response = new Response({context:'movements', debug:true});
+    var response = new Response({context:'movements', debug:!!options.debug});
 
     seneca
         .add({init: 'movements'},                   initialize)
@@ -91,9 +99,14 @@ module.exports = function movements(options) {
     ;
 
     function initialize(args, respond){
-        seneca.use('jsonfile-store', {
-            map:{'-/-/movement':'*'},
-            folder:'data'
+        //seneca.use('jsonfile-store', {
+        seneca.use('redis-store', {
+            options:{},
+            uri: 'redis://' +
+                 //options.store.user + ':' + options.store.password +
+                 '@' + options.store.host + ':' + options.store.port,
+            map:{'-/-/movement':'*'}
+        //    folder:'data'
         });
 
         return respond();
@@ -145,7 +158,7 @@ module.exports = function movements(options) {
             res = _.extend({requestId: args.requestId}, params);
             if (!(typeof args.query === "undefined"  || args.query === "")) {
                 seneca.make$('movement').list$(
-                    {name: params.query,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
+                    {name: params.query},//,limit$:params.limit,skip$:params.skip,fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
                         if(err) return response.make(400, _.extend(res, {error: err}), respond);
                         else if(!resources || resources.length === 0)
@@ -164,7 +177,7 @@ module.exports = function movements(options) {
                 });
             } else {
                 seneca.make$('movement').list$(
-                    {limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
+                    //{limit$:params.limit, skip$:params.skip, fields$:params.fields,sort$:params.sort},
                     function (err, resources) {
                         if(err) return response.make(400, _.extend(res, {error: err}), respond);
                         else if(!resources || resources.length === 0)
@@ -228,7 +241,7 @@ module.exports = function movements(options) {
                 args.resources,
                 function(resource, callback){
                     seneca.make$('movement').load$(
-                        {name: resource.name, fields$:['id']},
+                        {name: resource.name},
                         function (err, resources) {
                             if (err) return callback(false);
                             else if(!resources || resources.length === 0) return callback(false);
@@ -253,7 +266,9 @@ module.exports = function movements(options) {
                                         organizers: resource.organizers
                                     }).save$(function (err, movement) {
                                         if (err) return callback(err);
-                                        else callback(null, movement.data$(false));
+                                        else {
+                                            callback(null, movement.data$(false));
+                                        }
                                     });
                                 },
                                 function(err, results){
@@ -339,8 +354,9 @@ module.exports = function movements(options) {
                 args.requestId === null || args.requestId === "")
                 return response.make(400, _.extend(res, {error: new Error('No resource id or requestId provided.')}), respond);
 
-            seneca.make$('movement').remove$(args.id, function(err, movement){
-                if(err) return response.make(400, _.extend(res, {error: err}), respond);
+            seneca.make$('movement')
+                .remove$(args.id, function(err, movement){
+                if(err) return response.make(500, _.extend(res, {error: err}), respond);
                 else if(!movement) return response.make(404, res, respond);
                 else return response.make(204, _.extend(res, {
                             latency: Date.now()-startTime
