@@ -3,16 +3,28 @@
  */
 "use strict";
 
-var commandlineParameters = {};
+var _ = require('lodash');
+var options = {};
 
 for(var i= 2, len=process.argv.length; i<len; i++){
     var argument = process.argv[i].split(':');
-    commandlineParameters[argument[0]] = argument[1];
+    options[argument[0]] = argument[1];
 }
+
+_.extend(options, {
+    resourceName: 'movements',
+    resourceFormat: {
+        required$: ['name'],
+        only$: ['id', 'name', 'description', 'image', 'organizers'],
+        name: 'string$',
+        description: 'string$',
+        image: 'string$'
+    }
+});
 
 require('seneca')()
     .use('redis-transport')
-    .use('movements', commandlineParameters)
+    .use('resource-service', options)
     .listen({type:'redis', pin:'role:movements,cmd:get'})
     .listen({type:'redis', pin:'role:movements,cmd:query'})
     .listen({type:'redis', pin:'role:movements,cmd:add'})

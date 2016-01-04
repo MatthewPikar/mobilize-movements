@@ -14,14 +14,22 @@
 
 "use strict";
 
-var assert = require('assert'),
-    asPromised = require('chai-as-promised'),
+var asPromised = require('chai-as-promised'),
     chai = require('chai')
         .use(asPromised),
     expect = chai.expect,
     async = require('async'),
     seneca = require('seneca')()
-        .use('../movements'),
+        .use('resource-service', {
+            resourceName: 'movements',
+            resourceFormat: {
+                required$: ['name'],
+                only$: ['id', 'name', 'description', 'image', 'organizers'],
+                name: 'string$',
+                description: 'string$',
+                image: 'string$'
+            }
+        }),
     Promise = require('bluebird'),
     act = Promise.promisify(seneca.act, {context:seneca})
     ;
