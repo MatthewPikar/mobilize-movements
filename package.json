@@ -7,11 +7,11 @@
     "email": "matthew.pikar@gmail.com"
   },
   "private": true,
-  "main": "movementsService.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node movementsService.js",
+    "start": "node index.js",
     "test": "mocha test/*.test.js",
-    "debug": "node movementsService.js debug:true"
+    "debug": "node index.js debug:true"
   },
   "dependencies": {
     "lodash": "^3.10.1",
