@@ -288,8 +288,8 @@ describe('movements', function(){
             return expect(result).to.eventually.have.deep.property('status.code', 204);
         });
         it('Should return a 200/204 status and ignore malformed options fields and bad query characters', function(){
-            var queryMalformed =        act({role: 'movements', cmd: 'query', requestId:'test5', query: 0});
-            var queryHasBadCharacters = act({role: 'movements', cmd: 'query', requestId:'test5', query:'i.see=a}nose'});
+            var queryMalformed =        act({role: 'movements', cmd: 'query', requestId:'test5', query: {name:0}});
+            var queryHasBadCharacters = act({role: 'movements', cmd: 'query', requestId:'test5', query: {name:'i.see=a}nose'}});
             var fieldsMalformed =       act({role: 'movements', cmd: 'query', requestId:'test5', fields: 0});
             var sortMalformed =         act({role: 'movements', cmd: 'query', requestId:'test5', sort: 0});
             var skipMalformed =         act({role: 'movements', cmd: 'query', requestId:'test5', skip: false});
@@ -306,7 +306,7 @@ describe('movements', function(){
         });
         it('Should return a 200 status along with the movements corresponding to the provided query.', function(){
             var result1 = act({role: 'movements', cmd: 'query', requestId: 'test1'});
-            var result2 = act({role: 'movements', cmd: 'query', requestId: 'test1', query:'wheel'});
+            var result2 = act({role: 'movements', cmd: 'query', requestId: 'test1', query:{name:'wheel'}});
 
             return Promise.all([
                 expect(result1).to.eventually.have.deep.property('status.code', 200),
