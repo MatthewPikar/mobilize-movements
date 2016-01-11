@@ -1,26 +1,28 @@
 /**
  * Created by mattpiekarczyk on 11/4/15.
  */
-"use strict";
+"use strict"
 
-var _ = require('lodash');
-var options = {};
+var _ = require('lodash')
+var options = {}
 
 for(var i= 2, len=process.argv.length; i<len; i++){
-    var argument = process.argv[i].split(':');
-    options[argument[0]] = argument[1];
+    var argument = process.argv[i].split(':')
+    options[argument[0]] = argument[1]
 }
 
 _.extend(options, {
     resourceName: 'movements',
     resourceFormat: {
         required$: ['name'],
-        only$: ['id', 'name', 'description', 'image', 'organizers'],
+        only$: ['id','name','topic','type','description', 'image', 'organizers'],
         name: 'string$',
+        topic: 'string$',
+        type: 'string$',
         description: 'string$',
         image: 'string$'
     }
-});
+})
 
 require('seneca')()
     .use('redis-transport')
@@ -30,4 +32,3 @@ require('seneca')()
     .listen({type:'redis', pin:'role:movements,cmd:add'})
     .listen({type:'redis', pin:'role:movements,cmd:modify'})
     .listen({type:'redis', pin:'role:movements,cmd:delete'})
-;
