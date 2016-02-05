@@ -25,9 +25,10 @@ _.extend(options, {
     }
 })
 
+var resourceService = require('resource-service')
 require('seneca')()
     .use('redis-transport')
-    .use('resource-service', options)
+    .use(resourceService, options)
     .listen({type:'redis', pin:'role:movements,cmd:get'})
     .listen({type:'redis', pin:'role:movements,cmd:query'})
     .listen({type:'redis', pin:'role:movements,cmd:add'})
