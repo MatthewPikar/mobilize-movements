@@ -15,8 +15,10 @@ _.extend(options, {
     resourceName: 'movements',
     resourceFormat: {
         required$: ['name'],
-        only$: ['id','name','topic','type','description', 'image', 'video', 'organizers'],
+        only$: ['id','name','created','modified','topic','type','description', 'image', 'video', 'organizers'],
         name: 'string$',
+        created: 'string$',
+        modified: 'string$',
         topic: 'string$',
         type: 'string$',
         description: 'string$',
